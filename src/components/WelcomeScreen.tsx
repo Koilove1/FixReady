@@ -27,8 +27,8 @@ export function WelcomeScreen({ onStart }: { onStart: () => void }) {
             <span key={status} className={`welcome-dot status-${status}`} />
           ))}
         </div>
-        <h1 className="welcome-title">RoomReady</h1>
-        <p className="welcome-tagline">Room status, live on every phone.</p>
+        <h1 className="welcome-title">FixReady</h1>
+        <p className="welcome-tagline">Room maintenance, live on every phone.</p>
         <button className="welcome-btn" onClick={onStart}>
           Get Started
         </button>

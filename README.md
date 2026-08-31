@@ -1,14 +1,14 @@
-# RoomReady
+# FixReady
 
-Mobile-first housekeeping app for a fixed 62-room property (100-113, 200-222, 300-323 and 325).
+Mobile-first maintenance app for a fixed 62-room property (100-113, 200-222, 300-323 and 325).
 
 On open, the app asks who's using the device:
 
-- **Front Desk** — a read-only board showing the status of every room.
-- **Housekeeping** — the same board, but tapping a room lets you set its status.
+- **Front Desk** — a read-only board showing the maintenance status of every room.
+- **Maintenance** — the same board, but tapping a room lets you set its status.
 
-Statuses are **Needs Cleaning** (yellow), **Out of Order** (red), and **Clean** (green). Every phone
-sees a change instantly, and a push notification goes out whenever a room's status changes. Tap
+Statuses are **Needs Repair** (yellow), **Out of Service** (red), and **Operational** (green). Every
+phone sees a change instantly, and a push notification goes out whenever a room's status changes. Tap
 **Switch** in the header to change roles.
 
 ## Finding a room
@@ -20,7 +20,7 @@ The **search box** filters as you type, and each digit narrows the list: `21` �
 `214` → one room. It matches the digits anywhere in the room number, so `14` finds 114, 214, and 314.
 Non-digits are ignored.
 
-The three **counters at the top are the status filter**: tap "Out of Order" to see only those rooms,
+The three **counters at the top are the status filter**: tap "Out of Service" to see only those rooms,
 tap it again to go back to all. Searching or filtering opens every floor automatically, so a match is
 never hidden inside a collapsed section.
 
@@ -71,7 +71,7 @@ You have to do these steps yourself since they're tied to your Google account.
   `localStorage`, so closing the tab doesn't reset it — but like the passcode itself, it only
   deters someone tapping at a phone, not anyone willing to open devtools.
 - The actual boundary is `firestore.rules`, which requires an authenticated (anonymous) session.
-- If you later want real accountability — knowing which specific housekeeper did what, and being
+- If you later want real accountability — knowing which specific technician did what, and being
   able to revoke one person's access — swap anonymous auth for per-user email/password accounts.
   The UI already records a name with each change; it's just self-reported today.
 
@@ -90,7 +90,7 @@ the project to the Blaze plan so Cloud Functions can deploy.
 - **iPhone**: you must first add the app to your Home Screen (Share → Add to Home Screen) and open
   it from that icon. iOS only permits web push for installed web apps (iOS 16.4+).
 
-Right now *every* registered device gets notified, including the housekeeper who made the change.
+Right now *every* registered device gets notified, including the technician who made the change.
 If you only want your own phone to be notified, mark your device's token as the owner one and filter
 the recipient list in the Cloud Function.
 

@@ -10,7 +10,7 @@ const LOCKOUT_KEY = 'roomready:lockout';
 const MAX_ATTEMPTS = 5;
 
 /**
- * Each lockout is longer than the last, so a housekeeper who fat-fingers the
+ * Each lockout is longer than the last, so a technician who fat-fingers the
  * code waits half a minute while someone working through the 10,000 possible
  * codes stalls out. The last step repeats forever.
  */
@@ -120,7 +120,7 @@ export function PasscodeGate({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div className="screen-center">
       <form className="passcode-card" onSubmit={handleSubmit}>
-        <h1>RoomReady</h1>
+        <h1>FixReady</h1>
         <p>Enter the staff passcode to continue.</p>
         <input
           type="password"

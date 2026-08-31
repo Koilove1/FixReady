@@ -22,7 +22,7 @@ export default function App() {
   const [unlocked, setUnlocked] = useState(isUnlocked);
   const [role, setRole] = useState<Role | null>(loadRole);
   const [name, setName] = useState(loadName);
-  /** Set when housekeeping is picked, so choosing the role always asks who's holding the phone. */
+  /** Set when maintenance is picked, so choosing the role always asks who's holding the phone. */
   const [askName, setAskName] = useState(false);
   const { rooms, loading, error, slow, retry, setRoomStatus } = useRooms();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -83,14 +83,14 @@ export default function App() {
         onPick={(picked) => {
           saveRole(picked);
           setRole(picked);
-          if (picked === 'housekeeping') setAskName(true);
+          if (picked === 'maintenance') setAskName(true);
         }}
       />
     );
   }
 
-  // Housekeeping writes to the board, so it signs in with a name before seeing it.
-  if (role === 'housekeeping' && (askName || !name)) {
+  // Maintenance writes to the board, so it signs in with a name before seeing it.
+  if (role === 'maintenance' && (askName || !name)) {
     return (
       <NameGate
         initial={name}
@@ -105,7 +105,7 @@ export default function App() {
     );
   }
 
-  const canEdit = role === 'housekeeping';
+  const canEdit = role === 'maintenance';
 
   /**
    * A write that never reaches Firestore still shows locally, so warn if it
@@ -152,7 +152,7 @@ export default function App() {
       <header className="app-header">
         <div className="header-row">
           <div className="header-title">
-            <h1>RoomReady</h1>
+            <h1>FixReady</h1>
             <span className="role-tag">{ROLE_LABEL[role]}</span>
             {canEdit && (
               <button className="name-chip" onClick={() => setAskName(true)}>

@@ -99,7 +99,7 @@ body {
   font-weight: 600;
 }
 
-/* Blue, not amber — amber now means "Needs Cleaning" everywhere else. */
+/* Blue, not amber — amber now means "Needs Repair" everywhere else. */
 .demo-banner {
   background: rgba(86, 204, 242, 0.1);
   border: 1px solid rgba(86, 204, 242, 0.35);

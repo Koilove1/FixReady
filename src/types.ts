@@ -10,9 +10,9 @@ export interface Room {
 }
 
 export const STATUS_LABEL: Record<RoomStatus, string> = {
-  clean: 'Clean',
-  dirty: 'Needs Cleaning',
-  out_of_order: 'Out of Order',
+  clean: 'Operational',
+  dirty: 'Needs Repair',
+  out_of_order: 'Out of Service',
 };
 
 export const STATUS_ORDER: RoomStatus[] = ['dirty', 'out_of_order', 'clean'];

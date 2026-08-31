@@ -22,6 +22,23 @@ export interface RoomDetails {
   fix: string;
 }
 
+/**
+ * One record in a room's maintenance history. Every save appends one of these,
+ * so the log is a permanent, append-only record rather than the room's latest
+ * state. `roomName` is stored on the entry so the export doesn't have to walk
+ * back up to the parent room.
+ */
+export interface LogEntry {
+  id: string;
+  roomName: string;
+  status: RoomStatus;
+  issue: string | null;
+  material: string | null;
+  fix: string | null;
+  updatedBy: string | null;
+  createdAt: number;
+}
+
 export const STATUS_LABEL: Record<RoomStatus, string> = {
   clean: 'Operational',
   dirty: 'Needs Repair',

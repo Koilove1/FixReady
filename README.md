@@ -114,16 +114,39 @@ It uses the same `.env.local` config as the app and signs in anonymously, so it 
 service-account key. Run it only once every client has picked up the new build — a stale cached
 client still holding the old list would re-create the numbers you just removed.
 
+## Maintenance history and Excel export
+
+Every save is recorded as a dated entry in a per-room, append-only history rather than overwriting the
+room's last note. Opening a room shows its full history below the form (newest first), and the room's
+latest entry is what appears on the board.
+
+- In **Firebase mode** each entry is a document in the room's `log` subcollection (`rooms/{room}/log`).
+  The room document still holds the current status so the board stays a single fast listener; the
+  subcollection holds the history.
+- In **demo mode** the history lives alongside the rooms in `localStorage`.
+
+Tap **Export** in the header to download the whole property's history as a real `.xlsx` file — one row
+per entry, with columns for the room, date, status, issue, material used, fix, and who made the change.
+The file is built in the browser (no backend needed, works in demo mode too) and is always current at
+the moment you export.
+
+> The export uses SheetJS (`xlsx`) to write the file. The library is loaded only when you tap Export, so
+> it stays out of the initial download. Note: this pinned version carries published advisories, but they
+> are all in the file-**parsing** path — the app only ever **writes** files, never reads them — so they
+> don't apply here. To clear `npm audit` anyway, install the maintained build from SheetJS's own CDN:
+> `npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`.
+
 ## Project layout
 
 ```
 src/
-  App.tsx                 role routing, search, floor grouping, filters, summary counts
+  App.tsx                 role routing, search, floor grouping, filters, summary counts, export
   firebase.ts             SDK init, anonymous sign-in, messaging
-  localStore.ts           demo-mode persistence
+  localStore.ts           demo-mode persistence (rooms + history)
+  exportXlsx.ts           builds the .xlsx download from the history
   registerFcmSw.ts        registers the push service worker
-  types.ts                Room, RoomStatus, the fixed ROOM_NUMBERS list
-  hooks/useRooms.ts       Firestore subscription and mutations
+  types.ts                Room, RoomStatus, RoomDetails, LogEntry, the fixed ROOM_NUMBERS list
+  hooks/useRooms.ts       Firestore subscription, status writes, history reads
   hooks/useNotifications.ts  permission flow + token registration
   components/             RoomCard, FloorSection, StatusSheet, RolePicker, PasscodeGate
 public/

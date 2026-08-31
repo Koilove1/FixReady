@@ -401,7 +401,77 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* The form plus the history can outgrow the screen — let the sheet scroll. */
+  max-height: 88vh;
+  overflow-y: auto;
   animation: slide-up 0.18s ease;
+}
+
+.history {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.history-empty {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.history-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.history-status {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-status.status-clean {
+  color: var(--clean);
+}
+.history-status.status-dirty {
+  color: var(--dirty);
+}
+.history-status.status-out_of_order {
+  color: var(--ooo);
+}
+
+.history-date {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.history-line {
+  font-size: 13px;
+  margin: 2px 0;
+  color: var(--text);
+}
+
+.history-by {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 0;
 }
 
 @keyframes slide-up {

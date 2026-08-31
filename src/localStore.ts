@@ -1,7 +1,8 @@
 import { ROOM_NUMBERS, normalizeStatus } from './types';
-import type { Room } from './types';
+import type { Room, LogEntry } from './types';
 
 const KEY = 'roomready:demoRooms';
+const LOG_KEY = 'roomready:demoLog';
 
 function blank(name: string, i: number): Room {
   return {
@@ -55,4 +56,21 @@ export function loadRooms(): Room[] {
 
 export function saveRooms(rooms: Room[]): void {
   localStorage.setItem(KEY, JSON.stringify(rooms));
+}
+
+/** The demo-mode maintenance history — the counterpart to the Firestore log. */
+export function loadLog(): LogEntry[] {
+  const raw = localStorage.getItem(LOG_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as LogEntry[];
+  } catch {
+    return [];
+  }
+}
+
+export function appendLog(entry: LogEntry): void {
+  const all = loadLog();
+  all.push(entry);
+  localStorage.setItem(LOG_KEY, JSON.stringify(all));
 }

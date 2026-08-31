@@ -13,6 +13,14 @@ service cloud.firestore {
       allow create, update, delete: if signedIn();
     }
 
+    // The maintenance history is append-only: entries can be read and created,
+    // never edited or deleted. The {path=**} form also covers the collection
+    // group query the Excel export runs across every room's log.
+    match /{path=**}/log/{entryId} {
+      allow read, create: if signedIn();
+      allow update, delete: if false;
+    }
+
     match /deviceTokens/{token} {
       allow read: if false;
       allow create, update: if signedIn();

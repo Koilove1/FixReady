@@ -11,6 +11,7 @@ import { FloorSection } from './components/FloorSection';
 import { RolePicker, ROLE_LABEL, loadRole, saveRole, clearRole } from './components/RolePicker';
 import type { Role } from './components/RolePicker';
 import { loadName, saveName } from './staffName';
+import { exportLogToXlsx } from './exportXlsx';
 import { STATUS_ORDER, STATUS_LABEL, FLOOR_IDS, floorOf } from './types';
 import type { Room, RoomStatus, RoomDetails } from './types';
 
@@ -24,12 +25,14 @@ export default function App() {
   const [name, setName] = useState(loadName);
   /** Set when maintenance is picked, so choosing the role always asks who's holding the phone. */
   const [askName, setAskName] = useState(false);
-  const { rooms, loading, error, slow, retry, setRoomStatus } = useRooms();
+  const { rooms, loading, error, slow, retry, setRoomStatus, loadRoomHistory, loadAllHistory } =
+    useRooms();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [openFloors, setOpenFloors] = useState<Record<string, boolean>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (unlocked) void ensureSignedIn();
@@ -133,6 +136,25 @@ export default function App() {
       });
   }
 
+  /** Pull the full maintenance history and download it as an .xlsx. */
+  async function handleExport() {
+    setExporting(true);
+    setSaveError(null);
+    try {
+      const entries = await loadAllHistory();
+      if (entries.length === 0) {
+        setSaveError('No maintenance history to export yet.');
+        return;
+      }
+      await exportLogToXlsx(entries);
+    } catch (err) {
+      console.error('Export failed', err);
+      setSaveError(`Couldn't build the spreadsheet. ${describeError(err)}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   /** Tapping the active count clears the filter, so the pills double as a toggle. */
   function toggleFilter(status: RoomStatus) {
     setFilter((prev) => (prev === status ? 'all' : status));
@@ -161,6 +183,9 @@ export default function App() {
             )}
           </div>
           <div className="header-actions">
+            <button className="bell-btn" onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Exporting…' : 'Export'}
+            </button>
             <button className="bell-btn" onClick={switchRole}>
               Switch
             </button>
@@ -278,6 +303,7 @@ export default function App() {
           name={name}
           onClose={() => setSelectedId(null)}
           onSave={(status, details) => saveStatus(selectedRoom, status, details)}
+          loadHistory={loadRoomHistory}
         />
       )}
     </div>

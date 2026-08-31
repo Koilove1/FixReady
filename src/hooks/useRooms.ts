@@ -13,7 +13,7 @@ import {
 import { db, isFirebaseConfigured } from '../firebase';
 import { loadRooms, saveRooms } from '../localStore';
 import { ROOM_NUMBERS, normalizeStatus } from '../types';
-import type { Room, RoomStatus } from '../types';
+import type { Room, RoomStatus, RoomDetails } from '../types';
 
 /** How long to wait before telling the user the database isn't answering. */
 const SLOW_MS = 8000;
@@ -68,6 +68,9 @@ export function useRooms() {
               id: d.id,
               name: String(data.name),
               status: normalizeStatus(data.status),
+              issue: data.issue ?? null,
+              material: data.material ?? null,
+              fix: data.fix ?? null,
               updatedBy: data.updatedBy ?? null,
               updatedAt: (data.updatedAt as Timestamp | null)?.toMillis?.() ?? null,
               createdAt: (data.createdAt as Timestamp | null)?.toMillis?.() ?? 0,
@@ -87,6 +90,9 @@ export function useRooms() {
               batch.set(doc(database, 'rooms', name), {
                 name,
                 status: 'clean',
+                issue: null,
+                material: null,
+                fix: null,
                 updatedBy: null,
                 updatedAt: null,
                 createdAt: serverTimestamp(),
@@ -131,10 +137,22 @@ export function useRooms() {
   }
 
   /** Rejects if the change didn't reach the database, so callers can say so. */
-  async function setRoomStatus(roomId: string, status: RoomStatus, updatedBy: string) {
+  async function setRoomStatus(
+    roomId: string,
+    status: RoomStatus,
+    updatedBy: string,
+    details: RoomDetails,
+  ) {
+    // Keep empty notes out of the document — store null, not "".
+    const issue = details.issue.trim() || null;
+    const material = details.material.trim() || null;
+    const fix = details.fix.trim() || null;
+
     if (!isFirebaseConfigured || !db) {
       const next = rooms.map((r) =>
-        r.id === roomId ? { ...r, status, updatedBy, updatedAt: Date.now() } : r,
+        r.id === roomId
+          ? { ...r, status, issue, material, fix, updatedBy, updatedAt: Date.now() }
+          : r,
       );
       saveRooms(next);
       setRooms(next);
@@ -142,6 +160,9 @@ export function useRooms() {
     }
     await updateDoc(doc(db, 'rooms', roomId), {
       status,
+      issue,
+      material,
+      fix,
       updatedBy,
       updatedAt: serverTimestamp(),
     });

@@ -8,6 +8,9 @@ function blank(name: string, i: number): Room {
     id: `demo-${name}`,
     name,
     status: 'clean',
+    issue: null,
+    material: null,
+    fix: null,
     updatedBy: null,
     updatedAt: null,
     createdAt: Date.now() + i,
@@ -23,7 +26,15 @@ function reconcile(stored: Room[]): Room[] {
   return ROOM_NUMBERS.map((name, i) => {
     const existing = byName.get(name);
     if (!existing) return blank(name, i);
-    return { ...existing, id: `demo-${name}`, status: normalizeStatus(existing.status) };
+    return {
+      ...existing,
+      id: `demo-${name}`,
+      status: normalizeStatus(existing.status),
+      // Rooms saved before these fields existed have them as undefined.
+      issue: existing.issue ?? null,
+      material: existing.material ?? null,
+      fix: existing.fix ?? null,
+    };
   });
 }
 

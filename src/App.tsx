@@ -12,7 +12,7 @@ import { RolePicker, ROLE_LABEL, loadRole, saveRole, clearRole } from './compone
 import type { Role } from './components/RolePicker';
 import { loadName, saveName } from './staffName';
 import { STATUS_ORDER, STATUS_LABEL, FLOOR_IDS, floorOf } from './types';
-import type { Room, RoomStatus } from './types';
+import type { Room, RoomStatus, RoomDetails } from './types';
 
 type Filter = 'all' | RoomStatus;
 
@@ -111,7 +111,7 @@ export default function App() {
    * A write that never reaches Firestore still shows locally, so warn if it
    * hasn't confirmed — otherwise a lost change looks exactly like a saved one.
    */
-  function saveStatus(room: Room, status: RoomStatus) {
+  function saveStatus(room: Room, status: RoomStatus, details: RoomDetails) {
     setSaveError(null);
     let settled = false;
     const pending = setTimeout(() => {
@@ -119,7 +119,7 @@ export default function App() {
         setSaveError(`Room ${room.name} hasn't synced yet — keep the app open until it does.`);
       }
     }, 6000);
-    setRoomStatus(room.id, status, name)
+    setRoomStatus(room.id, status, name, details)
       .then(() => {
         settled = true;
         clearTimeout(pending);
@@ -277,7 +277,7 @@ export default function App() {
           room={selectedRoom}
           name={name}
           onClose={() => setSelectedId(null)}
-          onSetStatus={(status) => saveStatus(selectedRoom, status)}
+          onSave={(status, details) => saveStatus(selectedRoom, status, details)}
         />
       )}
     </div>

@@ -4,9 +4,22 @@ export interface Room {
   id: string;
   name: string;
   status: RoomStatus;
+  /** What was wrong with the room. */
+  issue: string | null;
+  /** What material or part was used in the repair. */
+  material: string | null;
+  /** How the issue was fixed. */
+  fix: string | null;
   updatedBy: string | null;
   updatedAt: number | null;
   createdAt: number;
+}
+
+/** The free-text maintenance details captured when a room is updated. */
+export interface RoomDetails {
+  issue: string;
+  material: string;
+  fix: string;
 }
 
 export const STATUS_LABEL: Record<RoomStatus, string> = {

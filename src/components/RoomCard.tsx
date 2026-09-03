@@ -17,6 +17,7 @@ export function RoomCard({ room, onTap }: { room: Room; onTap?: () => void }) {
     <>
       <span className="room-name">{room.name}</span>
       <span className="room-status">{STATUS_LABEL[room.status]}</span>
+      {room.issue && <span className="room-issue">{room.issue}</span>}
       {room.updatedBy && (
         <span className="room-meta">
           {room.updatedBy} &middot; {timeAgo(room.updatedAt)}

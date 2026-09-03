@@ -28,7 +28,7 @@ let auth: Auth | null = null;
 
 /**
  * Keep the room cache and the pending-write queue in IndexedDB rather than in
- * memory. Housekeeping works the floors, so a status tapped in a weak-signal
+ * memory. Maintenance works the floors, so a status tapped in a weak-signal
  * corridor has to survive the app being closed before it reaches the server,
  * and the board has to open with the last known state instead of nothing.
  *

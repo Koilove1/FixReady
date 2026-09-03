@@ -1,13 +1,17 @@
 import { ROOM_NUMBERS, normalizeStatus } from './types';
-import type { Room } from './types';
+import type { Room, LogEntry } from './types';
 
 const KEY = 'roomready:demoRooms';
+const LOG_KEY = 'roomready:demoLog';
 
 function blank(name: string, i: number): Room {
   return {
     id: `demo-${name}`,
     name,
     status: 'clean',
+    issue: null,
+    material: null,
+    fix: null,
     updatedBy: null,
     updatedAt: null,
     createdAt: Date.now() + i,
@@ -23,7 +27,15 @@ function reconcile(stored: Room[]): Room[] {
   return ROOM_NUMBERS.map((name, i) => {
     const existing = byName.get(name);
     if (!existing) return blank(name, i);
-    return { ...existing, id: `demo-${name}`, status: normalizeStatus(existing.status) };
+    return {
+      ...existing,
+      id: `demo-${name}`,
+      status: normalizeStatus(existing.status),
+      // Rooms saved before these fields existed have them as undefined.
+      issue: existing.issue ?? null,
+      material: existing.material ?? null,
+      fix: existing.fix ?? null,
+    };
   });
 }
 
@@ -44,4 +56,21 @@ export function loadRooms(): Room[] {
 
 export function saveRooms(rooms: Room[]): void {
   localStorage.setItem(KEY, JSON.stringify(rooms));
+}
+
+/** The demo-mode maintenance history — the counterpart to the Firestore log. */
+export function loadLog(): LogEntry[] {
+  const raw = localStorage.getItem(LOG_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as LogEntry[];
+  } catch {
+    return [];
+  }
+}
+
+export function appendLog(entry: LogEntry): void {
+  const all = loadLog();
+  all.push(entry);
+  localStorage.setItem(LOG_KEY, JSON.stringify(all));
 }

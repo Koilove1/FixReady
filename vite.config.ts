@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'RoomReady',
-        short_name: 'RoomReady',
-        description: 'Housekeeping room status tracker',
+        name: 'FixReady',
+        short_name: 'FixReady',
+        description: 'Hotel room maintenance tracker',
         theme_color: '#000000',
         background_color: '#000000',
         display: 'standalone',

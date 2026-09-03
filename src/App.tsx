@@ -11,8 +11,9 @@ import { FloorSection } from './components/FloorSection';
 import { RolePicker, ROLE_LABEL, loadRole, saveRole, clearRole } from './components/RolePicker';
 import type { Role } from './components/RolePicker';
 import { loadName, saveName } from './staffName';
+import { exportLogToXlsx } from './exportXlsx';
 import { STATUS_ORDER, STATUS_LABEL, FLOOR_IDS, floorOf } from './types';
-import type { Room, RoomStatus } from './types';
+import type { Room, RoomStatus, RoomDetails } from './types';
 
 type Filter = 'all' | RoomStatus;
 
@@ -22,14 +23,16 @@ export default function App() {
   const [unlocked, setUnlocked] = useState(isUnlocked);
   const [role, setRole] = useState<Role | null>(loadRole);
   const [name, setName] = useState(loadName);
-  /** Set when housekeeping is picked, so choosing the role always asks who's holding the phone. */
+  /** Set when maintenance is picked, so choosing the role always asks who's holding the phone. */
   const [askName, setAskName] = useState(false);
-  const { rooms, loading, error, slow, retry, setRoomStatus } = useRooms();
+  const { rooms, loading, error, slow, retry, setRoomStatus, loadRoomHistory, loadAllHistory } =
+    useRooms();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [openFloors, setOpenFloors] = useState<Record<string, boolean>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (unlocked) void ensureSignedIn();
@@ -83,14 +86,14 @@ export default function App() {
         onPick={(picked) => {
           saveRole(picked);
           setRole(picked);
-          if (picked === 'housekeeping') setAskName(true);
+          if (picked === 'maintenance') setAskName(true);
         }}
       />
     );
   }
 
-  // Housekeeping writes to the board, so it signs in with a name before seeing it.
-  if (role === 'housekeeping' && (askName || !name)) {
+  // Maintenance writes to the board, so it signs in with a name before seeing it.
+  if (role === 'maintenance' && (askName || !name)) {
     return (
       <NameGate
         initial={name}
@@ -105,13 +108,13 @@ export default function App() {
     );
   }
 
-  const canEdit = role === 'housekeeping';
+  const canEdit = role === 'maintenance';
 
   /**
    * A write that never reaches Firestore still shows locally, so warn if it
    * hasn't confirmed — otherwise a lost change looks exactly like a saved one.
    */
-  function saveStatus(room: Room, status: RoomStatus) {
+  function saveStatus(room: Room, status: RoomStatus, details: RoomDetails) {
     setSaveError(null);
     let settled = false;
     const pending = setTimeout(() => {
@@ -119,7 +122,7 @@ export default function App() {
         setSaveError(`Room ${room.name} hasn't synced yet — keep the app open until it does.`);
       }
     }, 6000);
-    setRoomStatus(room.id, status, name)
+    setRoomStatus(room.id, status, name, details)
       .then(() => {
         settled = true;
         clearTimeout(pending);
@@ -131,6 +134,25 @@ export default function App() {
         console.error('Failed to save room status', err);
         setSaveError(`Couldn't save Room ${room.name}. ${describeError(err)}`);
       });
+  }
+
+  /** Pull the full maintenance history and download it as an .xlsx. */
+  async function handleExport() {
+    setExporting(true);
+    setSaveError(null);
+    try {
+      const entries = await loadAllHistory();
+      if (entries.length === 0) {
+        setSaveError('No maintenance history to export yet.');
+        return;
+      }
+      await exportLogToXlsx(entries);
+    } catch (err) {
+      console.error('Export failed', err);
+      setSaveError(`Couldn't build the spreadsheet. ${describeError(err)}`);
+    } finally {
+      setExporting(false);
+    }
   }
 
   /** Tapping the active count clears the filter, so the pills double as a toggle. */
@@ -152,7 +174,7 @@ export default function App() {
       <header className="app-header">
         <div className="header-row">
           <div className="header-title">
-            <h1>RoomReady</h1>
+            <h1>FixReady</h1>
             <span className="role-tag">{ROLE_LABEL[role]}</span>
             {canEdit && (
               <button className="name-chip" onClick={() => setAskName(true)}>
@@ -161,6 +183,9 @@ export default function App() {
             )}
           </div>
           <div className="header-actions">
+            <button className="bell-btn" onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Exporting…' : 'Export'}
+            </button>
             <button className="bell-btn" onClick={switchRole}>
               Switch
             </button>
@@ -277,7 +302,8 @@ export default function App() {
           room={selectedRoom}
           name={name}
           onClose={() => setSelectedId(null)}
-          onSetStatus={(status) => saveStatus(selectedRoom, status)}
+          onSave={(status, details) => saveStatus(selectedRoom, status, details)}
+          loadHistory={loadRoomHistory}
         />
       )}
     </div>

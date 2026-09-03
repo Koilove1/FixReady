@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 
 /**
- * Housekeeping says who it is once, when the role is picked, so every room
+ * Maintenance says who it is once, when the role is picked, so every room
  * afterwards is attributed without asking again card by card. Prefilled from
  * the last name used on this device, so the usual case is one tap.
  */
@@ -25,7 +25,7 @@ export function NameGate({
   return (
     <div className="screen-center">
       <form className="name-card" onSubmit={handleSubmit}>
-        <h1>Housekeeping</h1>
+        <h1>Maintenance</h1>
         <p>Your name goes on every room you update, so the front desk knows who to ask.</p>
         <label className="field-label" htmlFor="staff-name">
           Your name

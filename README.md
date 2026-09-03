@@ -1,14 +1,14 @@
-# RoomReady
+# FixReady
 
-Mobile-first housekeeping app for a fixed 62-room property (100-113, 200-222, 300-323 and 325).
+Mobile-first maintenance app for a fixed 62-room property (100-113, 200-222, 300-323 and 325).
 
 On open, the app asks who's using the device:
 
-- **Front Desk** — a read-only board showing the status of every room.
-- **Housekeeping** — the same board, but tapping a room lets you set its status.
+- **Front Desk** — a read-only board showing the maintenance status of every room.
+- **Maintenance** — the same board, but tapping a room lets you set its status.
 
-Statuses are **Needs Cleaning** (yellow), **Out of Order** (red), and **Clean** (green). Every phone
-sees a change instantly, and a push notification goes out whenever a room's status changes. Tap
+Statuses are **Needs Repair** (yellow), **Out of Service** (red), and **Operational** (green). Every
+phone sees a change instantly, and a push notification goes out whenever a room's status changes. Tap
 **Switch** in the header to change roles.
 
 ## Finding a room
@@ -20,7 +20,7 @@ The **search box** filters as you type, and each digit narrows the list: `21` �
 `214` → one room. It matches the digits anywhere in the room number, so `14` finds 114, 214, and 314.
 Non-digits are ignored.
 
-The three **counters at the top are the status filter**: tap "Out of Order" to see only those rooms,
+The three **counters at the top are the status filter**: tap "Out of Service" to see only those rooms,
 tap it again to go back to all. Searching or filtering opens every floor automatically, so a match is
 never hidden inside a collapsed section.
 
@@ -71,7 +71,7 @@ You have to do these steps yourself since they're tied to your Google account.
   `localStorage`, so closing the tab doesn't reset it — but like the passcode itself, it only
   deters someone tapping at a phone, not anyone willing to open devtools.
 - The actual boundary is `firestore.rules`, which requires an authenticated (anonymous) session.
-- If you later want real accountability — knowing which specific housekeeper did what, and being
+- If you later want real accountability — knowing which specific technician did what, and being
   able to revoke one person's access — swap anonymous auth for per-user email/password accounts.
   The UI already records a name with each change; it's just self-reported today.
 
@@ -90,7 +90,7 @@ the project to the Blaze plan so Cloud Functions can deploy.
 - **iPhone**: you must first add the app to your Home Screen (Share → Add to Home Screen) and open
   it from that icon. iOS only permits web push for installed web apps (iOS 16.4+).
 
-Right now *every* registered device gets notified, including the housekeeper who made the change.
+Right now *every* registered device gets notified, including the technician who made the change.
 If you only want your own phone to be notified, mark your device's token as the owner one and filter
 the recipient list in the Cloud Function.
 
@@ -114,16 +114,39 @@ It uses the same `.env.local` config as the app and signs in anonymously, so it 
 service-account key. Run it only once every client has picked up the new build — a stale cached
 client still holding the old list would re-create the numbers you just removed.
 
+## Maintenance history and Excel export
+
+Every save is recorded as a dated entry in a per-room, append-only history rather than overwriting the
+room's last note. Opening a room shows its full history below the form (newest first), and the room's
+latest entry is what appears on the board.
+
+- In **Firebase mode** each entry is a document in the room's `log` subcollection (`rooms/{room}/log`).
+  The room document still holds the current status so the board stays a single fast listener; the
+  subcollection holds the history.
+- In **demo mode** the history lives alongside the rooms in `localStorage`.
+
+Tap **Export** in the header to download the whole property's history as a real `.xlsx` file — one row
+per entry, with columns for the room, date, status, issue, material used, fix, and who made the change.
+The file is built in the browser (no backend needed, works in demo mode too) and is always current at
+the moment you export.
+
+> The export uses SheetJS (`xlsx`) to write the file. The library is loaded only when you tap Export, so
+> it stays out of the initial download. Note: this pinned version carries published advisories, but they
+> are all in the file-**parsing** path — the app only ever **writes** files, never reads them — so they
+> don't apply here. To clear `npm audit` anyway, install the maintained build from SheetJS's own CDN:
+> `npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`.
+
 ## Project layout
 
 ```
 src/
-  App.tsx                 role routing, search, floor grouping, filters, summary counts
+  App.tsx                 role routing, search, floor grouping, filters, summary counts, export
   firebase.ts             SDK init, anonymous sign-in, messaging
-  localStore.ts           demo-mode persistence
+  localStore.ts           demo-mode persistence (rooms + history)
+  exportXlsx.ts           builds the .xlsx download from the history
   registerFcmSw.ts        registers the push service worker
-  types.ts                Room, RoomStatus, the fixed ROOM_NUMBERS list
-  hooks/useRooms.ts       Firestore subscription and mutations
+  types.ts                Room, RoomStatus, RoomDetails, LogEntry, the fixed ROOM_NUMBERS list
+  hooks/useRooms.ts       Firestore subscription, status writes, history reads
   hooks/useNotifications.ts  permission flow + token registration
   components/             RoomCard, FloorSection, StatusSheet, RolePicker, PasscodeGate
 public/

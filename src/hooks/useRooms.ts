@@ -1,19 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   collection,
+  collectionGroup,
   onSnapshot,
   orderBy,
   query,
   doc,
-  updateDoc,
+  getDocs,
   writeBatch,
   serverTimestamp,
   Timestamp,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase';
-import { loadRooms, saveRooms } from '../localStore';
+import { loadRooms, saveRooms, loadLog, appendLog } from '../localStore';
 import { ROOM_NUMBERS, normalizeStatus } from '../types';
-import type { Room, RoomStatus } from '../types';
+import type { Room, RoomStatus, RoomDetails, LogEntry } from '../types';
+
+/** Turn a Firestore log document into the LogEntry the app and export use. */
+function mapLogDoc(d: QueryDocumentSnapshot): LogEntry {
+  const data = d.data();
+  return {
+    id: d.id,
+    roomName: String(data.roomName ?? ''),
+    status: normalizeStatus(data.status),
+    issue: data.issue ?? null,
+    material: data.material ?? null,
+    fix: data.fix ?? null,
+    updatedBy: data.updatedBy ?? null,
+    createdAt: (data.createdAt as Timestamp | null)?.toMillis?.() ?? 0,
+  };
+}
 
 /** How long to wait before telling the user the database isn't answering. */
 const SLOW_MS = 8000;
@@ -68,6 +85,9 @@ export function useRooms() {
               id: d.id,
               name: String(data.name),
               status: normalizeStatus(data.status),
+              issue: data.issue ?? null,
+              material: data.material ?? null,
+              fix: data.fix ?? null,
               updatedBy: data.updatedBy ?? null,
               updatedAt: (data.updatedAt as Timestamp | null)?.toMillis?.() ?? null,
               createdAt: (data.createdAt as Timestamp | null)?.toMillis?.() ?? 0,
@@ -87,6 +107,9 @@ export function useRooms() {
               batch.set(doc(database, 'rooms', name), {
                 name,
                 status: 'clean',
+                issue: null,
+                material: null,
+                fix: null,
                 updatedBy: null,
                 updatedAt: null,
                 createdAt: serverTimestamp(),
@@ -131,21 +154,85 @@ export function useRooms() {
   }
 
   /** Rejects if the change didn't reach the database, so callers can say so. */
-  async function setRoomStatus(roomId: string, status: RoomStatus, updatedBy: string) {
+  async function setRoomStatus(
+    roomId: string,
+    status: RoomStatus,
+    updatedBy: string,
+    details: RoomDetails,
+  ) {
+    // Keep empty notes out of the document — store null, not "".
+    const issue = details.issue.trim() || null;
+    const material = details.material.trim() || null;
+    const fix = details.fix.trim() || null;
+
     if (!isFirebaseConfigured || !db) {
+      const room = rooms.find((r) => r.id === roomId);
+      const now = Date.now();
       const next = rooms.map((r) =>
-        r.id === roomId ? { ...r, status, updatedBy, updatedAt: Date.now() } : r,
+        r.id === roomId
+          ? { ...r, status, issue, material, fix, updatedBy, updatedAt: now }
+          : r,
       );
       saveRooms(next);
       setRooms(next);
+      if (room) {
+        appendLog({
+          id: `demo-${now}`,
+          roomName: room.name,
+          status,
+          issue,
+          material,
+          fix,
+          updatedBy,
+          createdAt: now,
+        });
+      }
       return;
     }
-    await updateDoc(doc(db, 'rooms', roomId), {
+
+    // The room doc keeps the latest state for the board; the log subcollection
+    // keeps every change. Writing both in one batch keeps them consistent.
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'rooms', roomId), {
       status,
+      issue,
+      material,
+      fix,
       updatedBy,
       updatedAt: serverTimestamp(),
     });
+    batch.set(doc(collection(db, 'rooms', roomId, 'log')), {
+      roomName: roomId,
+      status,
+      issue,
+      material,
+      fix,
+      updatedBy,
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
   }
 
-  return { rooms, loading, error, slow, retry, setRoomStatus };
+  /** A single room's history, newest first — loaded when its sheet opens. */
+  const loadRoomHistory = useCallback(async (roomId: string): Promise<LogEntry[]> => {
+    if (!isFirebaseConfigured || !db) {
+      const name = roomId.startsWith('demo-') ? roomId.slice(5) : roomId;
+      return loadLog()
+        .filter((e) => e.roomName === name)
+        .sort((a, b) => b.createdAt - a.createdAt);
+    }
+    const snap = await getDocs(collection(db, 'rooms', roomId, 'log'));
+    return snap.docs.map(mapLogDoc).sort((a, b) => b.createdAt - a.createdAt);
+  }, []);
+
+  /** Every room's history, newest first — the source for the Excel export. */
+  const loadAllHistory = useCallback(async (): Promise<LogEntry[]> => {
+    if (!isFirebaseConfigured || !db) {
+      return loadLog().sort((a, b) => b.createdAt - a.createdAt);
+    }
+    const snap = await getDocs(collectionGroup(db, 'log'));
+    return snap.docs.map(mapLogDoc).sort((a, b) => b.createdAt - a.createdAt);
+  }, []);
+
+  return { rooms, loading, error, slow, retry, setRoomStatus, loadRoomHistory, loadAllHistory };
 }

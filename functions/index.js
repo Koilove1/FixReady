@@ -6,9 +6,9 @@ const { getMessaging } = require('firebase-admin/messaging');
 initializeApp();
 
 const STATUS_LABEL = {
-  clean: 'Clean',
-  dirty: 'Needs Cleaning',
-  out_of_order: 'Out of Order',
+  clean: 'Operational',
+  dirty: 'Needs Repair',
+  out_of_order: 'Out of Service',
 };
 
 exports.notifyOnRoomStatusChange = onDocumentUpdated('rooms/{roomId}', async (event) => {

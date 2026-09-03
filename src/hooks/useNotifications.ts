@@ -41,7 +41,7 @@ export function useNotifications() {
       // Foreground messages: FCM's browser SDK doesn't show a system
       // notification while the tab is focused, so surface one manually.
       onMessage(messaging, (payload) => {
-        const title = payload.notification?.title ?? 'RoomReady';
+        const title = payload.notification?.title ?? 'FixReady';
         const body = payload.notification?.body ?? '';
         new Notification(title, { body, icon: '/icon-192.png' });
       });

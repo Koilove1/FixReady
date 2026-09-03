@@ -20,11 +20,5 @@ service cloud.firestore {
       allow read, create: if signedIn();
       allow update, delete: if false;
     }
-
-    match /deviceTokens/{token} {
-      allow read: if false;
-      allow create, update: if signedIn();
-      allow delete: if signedIn();
-    }
   }
 }

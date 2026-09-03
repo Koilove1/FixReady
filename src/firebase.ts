@@ -7,7 +7,6 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, type Auth } from 'firebase/auth';
-import { getMessaging, isSupported, type Messaging } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -59,11 +58,4 @@ export async function ensureSignedIn(): Promise<void> {
   if (!auth.currentUser) {
     await signInAnonymously(auth);
   }
-}
-
-export async function getMessagingIfSupported(): Promise<Messaging | null> {
-  if (!app) return null;
-  const supported = await isSupported().catch(() => false);
-  if (!supported) return null;
-  return getMessaging(app);
 }

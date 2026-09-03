@@ -1,5 +1,24 @@
 import { useEffect } from 'react';
 import { STATUS_ORDER } from '../types';
+import { readStored, writeStored } from '../storage';
+import { loadRole } from './RolePicker';
+
+const SEEN_KEY = 'seenWelcome';
+
+/**
+ * The welcome screen introduces the app, so it earns its place once and then
+ * gets out of the way -- a phone that lives on a maintenance cart opens this
+ * board dozens of times a shift. A device that already has a role picked has
+ * plainly been through the introduction, so it skips it too rather than being
+ * shown the splash one last time.
+ */
+export function hasOpenedBefore(): boolean {
+  return readStored(SEEN_KEY) === 'yes' || loadRole() !== null;
+}
+
+export function markOpened(): void {
+  writeStored(SEEN_KEY, 'yes');
+}
 
 /**
  * The screen the app opens on. Everything past here is a gate, so this is the

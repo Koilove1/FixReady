@@ -157,9 +157,11 @@ export function useRooms() {
   async function setRoomStatus(
     roomId: string,
     status: RoomStatus,
-    updatedBy: string,
     details: RoomDetails,
   ) {
+    // Nobody signs a change any more, so the field stays null on new writes.
+    // It is still read back, because entries logged earlier carry a name.
+    const updatedBy = null;
     // Keep empty notes out of the document — store null, not "".
     const issue = details.issue.trim() || null;
     const material = details.material.trim() || null;

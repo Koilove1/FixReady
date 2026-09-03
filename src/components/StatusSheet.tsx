@@ -6,16 +6,13 @@ function formatDate(ms: number): string {
   return ms ? new Date(ms).toLocaleString() : '';
 }
 
-/** The name is collected once by the name gate, so the sheet only confirms it. */
 export function StatusSheet({
   room,
-  name,
   onClose,
   onSave,
   loadHistory,
 }: {
   room: Room;
-  name: string;
   onClose: () => void;
   onSave: (status: RoomStatus, details: RoomDetails) => void;
   loadHistory: (roomId: string) => Promise<LogEntry[]>;
@@ -106,7 +103,6 @@ export function StatusSheet({
           placeholder="e.g. Replaced the cartridge and resealed the joint"
         />
 
-        <p className="sheet-note">Saving as {name}</p>
         <button type="submit">Save entry</button>
         <button type="button" className="link-btn" onClick={onClose}>
           Cancel

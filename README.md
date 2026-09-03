@@ -59,12 +59,11 @@ You have to do these steps yourself since they're tied to your Google account.
 
 ## How access works
 
-- There is no passcode. Anyone with the URL reaches the board, picks a role, and — for
-  maintenance — enters a name before making changes.
+- There is no passcode and no sign-in. Anyone with the URL reaches the board and picks a role.
 - The access boundary is `firestore.rules`, which requires an authenticated (anonymous) session.
-- If you later want real accountability — knowing which specific technician did what, and being
-  able to revoke one person's access — swap anonymous auth for per-user email/password accounts.
-  The UI already records a name with each change; it's just self-reported today.
+- Changes are recorded without a name, so the log shows what happened and when, not who did it.
+  If you later want that accountability — knowing which technician did what, and being able to
+  revoke one person's access — swap anonymous auth for per-user email/password accounts.
 
 
 ## The room list
@@ -119,6 +118,6 @@ src/
   exportXlsx.ts           builds the .xlsx download from the history
   types.ts                Room, RoomStatus, RoomDetails, LogEntry, the fixed ROOM_NUMBERS list
   hooks/useRooms.ts       Firestore subscription, status writes, history reads
-  components/             RoomCard, FloorSection, StatusSheet, RolePicker, NameGate
+  components/             RoomCard, FloorSection, StatusSheet, RolePicker, WelcomeScreen
 firestore.rules           access rules
 ```

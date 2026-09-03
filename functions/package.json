@@ -1,5 +1,5 @@
 {
-  "name": "roomready-functions",
+  "name": "fixready-functions",
   "private": true,
   "engines": {
     "node": "20"

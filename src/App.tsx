@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { ensureSignedIn, isFirebaseConfigured } from './firebase';
 import { useRooms, describeError } from './hooks/useRooms';
-import { PasscodeGate, isUnlocked } from './components/PasscodeGate';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { RoomCard } from './components/RoomCard';
 import { StatusSheet } from './components/StatusSheet';
@@ -18,9 +17,8 @@ import type { Room, RoomStatus, RoomDetails } from './types';
 type Filter = 'all' | RoomStatus;
 
 export default function App() {
-  /** The opening screen shows on every launch; everything after it is a gate. */
+  /** The opening screen shows on every launch, ahead of the role and name gates. */
   const [started, setStarted] = useState(false);
-  const [unlocked, setUnlocked] = useState(isUnlocked);
   const [role, setRole] = useState<Role | null>(loadRole);
   const [name, setName] = useState(loadName);
   /** Set when maintenance is picked, so choosing the role always asks who's holding the phone. */
@@ -35,8 +33,8 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (unlocked) void ensureSignedIn();
-  }, [unlocked]);
+    void ensureSignedIn();
+  }, []);
 
   const counts = useMemo(() => {
     const c: Record<RoomStatus, number> = { clean: 0, dirty: 0, out_of_order: 0 };
@@ -74,10 +72,6 @@ export default function App() {
 
   if (!started) {
     return <WelcomeScreen onStart={() => setStarted(true)} />;
-  }
-
-  if (!unlocked) {
-    return <PasscodeGate onUnlock={() => setUnlocked(true)} />;
   }
 
   if (!role) {

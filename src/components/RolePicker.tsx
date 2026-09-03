@@ -1,6 +1,8 @@
+import { readStored, writeStored, removeStored } from '../storage';
+
 export type Role = 'frontdesk' | 'maintenance';
 
-const ROLE_KEY = 'roomready:role';
+const ROLE_KEY = 'role';
 
 export const ROLE_LABEL: Record<Role, string> = {
   frontdesk: 'Front Desk',
@@ -8,16 +10,16 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 export function loadRole(): Role | null {
-  const saved = localStorage.getItem(ROLE_KEY);
+  const saved = readStored(ROLE_KEY);
   return saved === 'frontdesk' || saved === 'maintenance' ? saved : null;
 }
 
 export function saveRole(role: Role): void {
-  localStorage.setItem(ROLE_KEY, role);
+  writeStored(ROLE_KEY, role);
 }
 
 export function clearRole(): void {
-  localStorage.removeItem(ROLE_KEY);
+  removeStored(ROLE_KEY);
 }
 
 export function RolePicker({ onPick }: { onPick: (role: Role) => void }) {

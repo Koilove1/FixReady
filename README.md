@@ -51,7 +51,7 @@ You have to do these steps yourself since they're tied to your Google account.
    ```
    cp .env.example .env.local
    ```
-   Paste in the values from steps 2 and 4, and pick a `VITE_APP_PASSCODE` for your staff.
+   Paste in the values from steps 2 and 4.
 6. **Deploy the rules, function, and site**:
    ```
    npm install -g firebase-tools
@@ -64,13 +64,9 @@ You have to do these steps yourself since they're tied to your Google account.
 
 ## How access works
 
-- `VITE_APP_PASSCODE` is a **convenience gate** — it stops someone who stumbles onto the URL from
-  poking around. It is not real security, because the passcode ships in the client bundle.
-- Five wrong passcodes trigger a lockout that escalates on each repeat: 30 seconds, 1 minute,
-  5 minutes, then 15 minutes. A correct passcode clears the count. The lockout is kept in
-  `localStorage`, so closing the tab doesn't reset it — but like the passcode itself, it only
-  deters someone tapping at a phone, not anyone willing to open devtools.
-- The actual boundary is `firestore.rules`, which requires an authenticated (anonymous) session.
+- There is no passcode. Anyone with the URL reaches the board, picks a role, and — for
+  maintenance — enters a name before making changes.
+- The access boundary is `firestore.rules`, which requires an authenticated (anonymous) session.
 - If you later want real accountability — knowing which specific technician did what, and being
   able to revoke one person's access — swap anonymous auth for per-user email/password accounts.
   The UI already records a name with each change; it's just self-reported today.
@@ -148,7 +144,7 @@ src/
   types.ts                Room, RoomStatus, RoomDetails, LogEntry, the fixed ROOM_NUMBERS list
   hooks/useRooms.ts       Firestore subscription, status writes, history reads
   hooks/useNotifications.ts  permission flow + token registration
-  components/             RoomCard, FloorSection, StatusSheet, RolePicker, PasscodeGate
+  components/             RoomCard, FloorSection, StatusSheet, RolePicker, NameGate
 public/
   firebase-messaging-sw.js   background push handler
 functions/index.js        Cloud Function that sends the notifications

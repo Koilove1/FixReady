@@ -644,7 +644,7 @@ button {
   color: var(--muted);
 }
 
-/* Passcode, name, and message screens */
+/* Name and message screens */
 .screen-center {
   min-height: 100%;
   display: flex;
@@ -653,7 +653,6 @@ button {
   padding: 20px;
 }
 
-.passcode-card,
 .name-card {
   width: 100%;
   max-width: 340px;
@@ -666,14 +665,12 @@ button {
   gap: 14px;
 }
 
-.passcode-card h1,
 .name-card h1 {
   margin: 0;
   font-size: 26px;
   text-align: center;
 }
 
-.passcode-card p,
 .name-card p {
   margin: 0;
   color: var(--muted);
@@ -682,14 +679,6 @@ button {
   line-height: 1.5;
 }
 
-.passcode-card code {
-  background: var(--bg);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.passcode-card button,
 .name-card button:not(.link-btn) {
   padding: 14px;
   border-radius: 12px;
@@ -700,19 +689,8 @@ button {
   font-weight: 700;
 }
 
-.error-text {
-  color: #f87171 !important;
-  font-size: 13px;
-}
-
-.passcode-card button:disabled,
 .name-card button:disabled {
   opacity: 0.45;
-}
-
-/* Locked out: the field is inert, so it shouldn't look ready for typing. */
-.passcode-card input:disabled {
-  opacity: 0.5;
 }
 
 /* Who the board is being edited as; tap to hand the phone to someone else. */

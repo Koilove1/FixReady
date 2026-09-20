@@ -1,27 +1,44 @@
 # FixReady
 
 Mobile-first maintenance app for a fixed 62-room property (100-113, 200-222, 300-323 and 325).
+Built for two people — the maintenance tech and the manager — who both see the same list, live.
 
-On open, the app asks who's using the device:
+## The workflow
 
-- **Front Desk** — a read-only board showing the maintenance status of every room.
-- **Maintenance** — the same board, but tapping a room lets you set its status.
+The app opens straight to the list of maintenance reports. There's no sign-in and no role to pick.
 
-Statuses are **Needs Repair** (yellow), **Out of Service** (red), and **Operational** (green). Every
-phone sees a change instantly. Tap **Switch** in the header to change roles.
+1. **Report it.** Tap the round **+** at the bottom right. Pick the room (type any part of the
+   number — `08` offers 108, 208 and 308) and write what's wrong.
+2. **It appears in the list**, newest first, with open jobs always above finished ones.
+3. **Work it.** Tap a report to open it. You can read the original problem, add photos from the
+   camera or the photo library, and write down what you did and what tools and materials it took.
+   **Save for later** keeps the notes without closing the job.
+4. **Close it.** Tap **Mark complete**. The report turns green and drops below the open ones.
+   Marked done by mistake? Open it again and tap **Reopen this ticket**.
+5. **Export it.** The **Export** button in the header downloads an .xlsx of every report.
 
-## Finding a room
+The two counts at the top are also the filter: tap **Open** to see only open jobs, tap it again to
+go back to all.
 
-Rooms are grouped into collapsible **floor sections**, closed by default. Each floor header shows how
-many rooms it holds and a colored count per status, so the board fits on one screen without scrolling.
+## The spreadsheet
 
-The **search box** filters as you type, and each digit narrows the list: `21` → 121 and 210-219;
-`214` → one room. It matches the digits anywhere in the room number, so `14` finds 114, 214, and 314.
-Non-digits are ignored.
+One row per report, grouped by room and oldest-first within each room, so it reads like a logbook:
 
-The three **counters at the top are the status filter**: tap "Out of Service" to see only those rooms,
-tap it again to go back to all. Searching or filtering opens every floor automatically, so a match is
-never hidden inside a collapsed section.
+| Room | Reported | Problem | Fix | Materials Used | Completed | Status | Photos |
+| ---- | -------- | ------- | --- | -------------- | --------- | ------ | ------ |
+
+Dates are written `2026-09-20 14:05` so the columns sort correctly, and the header row has Excel's
+filter dropdowns switched on. Photos are counted rather than embedded — they stay in the app.
+
+## Photos
+
+Photos are shrunk on the phone to about 1024px on the longest edge before being saved, and each one
+is stored as its own Firestore document. That's what keeps the app on Firebase's **free Spark
+plan** — Cloud Storage would require a billing account. The practical ceiling is roughly 5,000
+photos, which is far more than a 62-room property will produce.
+
+A photo is never stored on the report itself, only counted there, so opening the list doesn't
+download any images. They load when you open a report.
 
 ## Running it right now (demo mode)
 
@@ -30,9 +47,10 @@ npm install
 npm run dev
 ```
 
-With no Firebase config present the app runs in **demo mode**: it seeds all 62 rooms and stores
-everything in that browser's `localStorage`. Nothing syncs between phones — it's just there so you
-can see and click through the interface before setting up a backend.
+With no Firebase config present the app runs in **demo mode** and stores everything in that
+browser's `localStorage`. Nothing syncs between phones — it's just there so you can click through
+the interface before setting up a backend. Note that browsers cap local storage at around 5MB, so
+demo mode runs out of room after a handful of photos.
 
 ## Making it real (Firebase setup)
 
@@ -48,76 +66,29 @@ You have to do these steps yourself since they're tied to your Google account.
    cp .env.example .env.local
    ```
    Paste in the values from step 2.
-5. **Deploy the rules and the site**:
+5. **Deploy the rules** in `firestore.rules`:
    ```
-   npm install -g firebase-tools
-   firebase login
-   firebase use --add          # select your project
-   npm run build
-   firebase deploy
+   npx firebase deploy --only firestore:rules
    ```
 
-## How access works
-
-- There is no passcode and no sign-in. Anyone with the URL reaches the board and picks a role.
-- The access boundary is `firestore.rules`, which requires an authenticated (anonymous) session.
-- Changes are recorded without a name, so the log shows what happened and when, not who did it.
-  If you later want that accountability — knowing which technician did what, and being able to
-  revoke one person's access — swap anonymous auth for per-user email/password accounts.
-
-
-## The room list
-
-The 62 rooms are fixed in code — there is no add or remove room in the UI. The first time the app
-connects to an empty Firestore project it creates the missing room documents (one per number, using
-the room number as the document ID) and marks them Clean. Anything else in the `rooms` collection is
-ignored.
-
-To change the property's room list, edit `ROOM_NUMBERS` in `src/types.ts`; new numbers get created
-on the next load. Numbers you removed are left behind in Firestore as documents the app filters out
-— clear them with the one-off cleanup script:
-
-```sh
-node scripts/prune-rooms.mjs           # dry run: lists what would be deleted
-node scripts/prune-rooms.mjs --delete  # actually deletes them
-```
-
-It uses the same `.env.local` config as the app and signs in anonymously, so it needs no
-service-account key. Run it only once every client has picked up the new build — a stale cached
-client still holding the old list would re-create the numbers you just removed.
-
-## Maintenance history and Excel export
-
-Every save is recorded as a dated entry in a per-room, append-only history rather than overwriting the
-room's last note. Opening a room shows its full history below the form (newest first), and the room's
-latest entry is what appears on the board.
-
-- In **Firebase mode** each entry is a document in the room's `log` subcollection (`rooms/{room}/log`).
-  The room document still holds the current status so the board stays a single fast listener; the
-  subcollection holds the history.
-- In **demo mode** the history lives alongside the rooms in `localStorage`.
-
-Tap **Export** in the header to download the whole property's history as a real `.xlsx` file — one row
-per entry, with columns for the room, date, status, issue, material used, fix, and who made the change.
-The file is built in the browser (no backend needed, works in demo mode too) and is always current at
-the moment you export.
-
-> The export uses SheetJS (`xlsx`) to write the file. The library is loaded only when you tap Export, so
-> it stays out of the initial download. Note: this pinned version carries published advisories, but they
-> are all in the file-**parsing** path — the app only ever **writes** files, never reads them — so they
-> don't apply here. To clear `npm audit` anyway, install the maintained build from SheetJS's own CDN:
-> `npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`.
-
-## Project layout
+## Data model
 
 ```
-src/
-  App.tsx                 role routing, search, floor grouping, filters, summary counts, export
-  firebase.ts             SDK init, anonymous sign-in
-  localStore.ts           demo-mode persistence (rooms + history)
-  exportXlsx.ts           builds the .xlsx download from the history
-  types.ts                Room, RoomStatus, RoomDetails, LogEntry, the fixed ROOM_NUMBERS list
-  hooks/useRooms.ts       Firestore subscription, status writes, history reads
-  components/             RoomCard, FloorSection, StatusSheet, RolePicker, WelcomeScreen
-firestore.rules           access rules
+tickets/{ticketId}
+  room         "214"
+  problem      what's wrong, written when the report is made
+  reportedAt   ms since epoch
+  status       "open" | "complete"
+  fix          what was done about it
+  materials    parts, materials and tools used
+  completedAt  ms since epoch, or null
+  photoCount   how many photos the subcollection holds
+
+tickets/{ticketId}/photos/{photoId}
+  dataUrl      compressed JPEG, capped at 700KB
+  createdAt    ms since epoch
 ```
+
+Times are written by the phone rather than by the server. `serverTimestamp()` reads back as null
+until the write confirms, which would drop a just-created report to the bottom of the list on the
+phone that made it.

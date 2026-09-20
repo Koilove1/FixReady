@@ -1,51 +1,54 @@
-export type RoomStatus = 'clean' | 'dirty' | 'out_of_order';
+/**
+ * A ticket is one maintenance job on one room: reported with a problem, then
+ * worked and closed with a description of the fix and the materials it took.
+ * Rooms have no state of their own any more — the record is the list of jobs.
+ */
+export type TicketStatus = 'open' | 'complete';
 
-export interface Room {
+export interface Ticket {
   id: string;
-  name: string;
-  status: RoomStatus;
-  /** What was wrong with the room. */
-  issue: string | null;
-  /** What material or part was used in the repair. */
-  material: string | null;
-  /** How the issue was fixed. */
+  /** Room number, e.g. "214". Always one of ROOM_NUMBERS. */
+  room: string;
+  /** What's wrong — filled in when the ticket is created. */
+  problem: string;
+  reportedAt: number;
+  status: TicketStatus;
+  /** What was done about it. Filled in while the job is worked. */
   fix: string | null;
-  updatedBy: string | null;
-  updatedAt: number | null;
-  createdAt: number;
+  /** Parts, materials and tools the repair took. */
+  materials: string | null;
+  completedAt: number | null;
+  /**
+   * Denormalised so the list can show a photo badge without reading the
+   * photos subcollection for every ticket on screen.
+   */
+  photoCount: number;
 }
 
-/** The free-text maintenance details captured when a room is updated. */
-export interface RoomDetails {
-  issue: string;
-  material: string;
+/** The work written back to a ticket — saved on its own or alongside closing it. */
+export interface TicketWork {
   fix: string;
+  materials: string;
 }
 
 /**
- * One record in a room's maintenance history. Every save appends one of these,
- * so the log is a permanent, append-only record rather than the room's latest
- * state. `roomName` is stored on the entry so the export doesn't have to walk
- * back up to the parent room.
+ * One photo attached to a ticket. `dataUrl` is a compressed JPEG held inline
+ * rather than in Cloud Storage, which keeps the app on Firebase's free plan —
+ * see `compressPhoto` for the size budget that makes that safe.
  */
-export interface LogEntry {
+export interface TicketPhoto {
   id: string;
-  roomName: string;
-  status: RoomStatus;
-  issue: string | null;
-  material: string | null;
-  fix: string | null;
-  updatedBy: string | null;
+  dataUrl: string;
   createdAt: number;
 }
 
-export const STATUS_LABEL: Record<RoomStatus, string> = {
-  clean: 'Operational',
-  dirty: 'Needs Repair',
-  out_of_order: 'Out of Service',
+export const STATUS_LABEL: Record<TicketStatus, string> = {
+  open: 'Open',
+  complete: 'Complete',
 };
 
-export const STATUS_ORDER: RoomStatus[] = ['dirty', 'out_of_order', 'clean'];
+/** Open first: the whole point of the list is what still needs doing. */
+export const STATUS_ORDER: TicketStatus[] = ['open', 'complete'];
 
 /** The property is a fixed 62 rooms: 100-113, 200-222, 300-323 and 325 (there is no 324). */
 export const ROOM_NUMBERS: string[] = [
@@ -55,15 +58,13 @@ export const ROOM_NUMBERS: string[] = [
   '325',
 ];
 
-/** Room numbers are floor-prefixed, so the first digit is the floor. */
-export function floorOf(roomName: string): string {
-  return roomName.slice(0, 1);
+const ROOM_SET = new Set(ROOM_NUMBERS);
+
+export function isRoom(value: string): boolean {
+  return ROOM_SET.has(value);
 }
 
-export const FLOOR_IDS: string[] = [...new Set(ROOM_NUMBERS.map(floorOf))];
-
-/** Rooms saved before `in_progress` was replaced by `out_of_order`. */
-export function normalizeStatus(status: unknown): RoomStatus {
-  if (status === 'clean' || status === 'dirty' || status === 'out_of_order') return status;
-  return 'dirty';
+/** Tickets written before a field existed read back as undefined. */
+export function normalizeStatus(status: unknown): TicketStatus {
+  return status === 'complete' ? 'complete' : 'open';
 }

@@ -1,29 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { ensureSignedIn, isFirebaseConfigured } from './firebase';
-import { useRooms, describeError } from './hooks/useRooms';
+import { useTickets, describeError } from './hooks/useTickets';
 import { WelcomeScreen, hasOpenedBefore, markOpened } from './components/WelcomeScreen';
-import { RoomCard } from './components/RoomCard';
-import { StatusSheet } from './components/StatusSheet';
-import { FloorSection } from './components/FloorSection';
-import { RolePicker, ROLE_LABEL, loadRole, saveRole, clearRole } from './components/RolePicker';
-import type { Role } from './components/RolePicker';
-import { exportLogToXlsx } from './exportXlsx';
-import { STATUS_ORDER, STATUS_LABEL, FLOOR_IDS, floorOf } from './types';
-import type { Room, RoomStatus, RoomDetails } from './types';
+import { TicketCard } from './components/TicketCard';
+import { NewTicketSheet } from './components/NewTicketSheet';
+import { TicketSheet } from './components/TicketSheet';
+import { exportTicketsToXlsx } from './exportXlsx';
+import { STATUS_ORDER, STATUS_LABEL } from './types';
+import type { TicketStatus, TicketWork } from './types';
 
-type Filter = 'all' | RoomStatus;
+type Filter = 'all' | TicketStatus;
+
+/** How long a write may stay unconfirmed before the app says so. */
+const SYNC_WARN_MS = 6000;
 
 export default function App() {
   /** The opening screen is a first-run introduction; later launches skip it. */
   const [started, setStarted] = useState(hasOpenedBefore);
-  const [role, setRole] = useState<Role | null>(loadRole);
-  const { rooms, loading, error, slow, retry, setRoomStatus, loadRoomHistory, loadAllHistory } =
-    useRooms();
+  const {
+    tickets,
+    loading,
+    error,
+    slow,
+    retry,
+    createTicket,
+    saveWork,
+    completeTicket,
+    reopenTicket,
+    fetchPhotos,
+    addPhoto,
+    removePhoto,
+  } = useTickets();
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [composing, setComposing] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
-  const [search, setSearch] = useState('');
-  const [openFloors, setOpenFloors] = useState<Record<string, boolean>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -32,38 +44,26 @@ export default function App() {
   }, []);
 
   const counts = useMemo(() => {
-    const c: Record<RoomStatus, number> = { clean: 0, dirty: 0, out_of_order: 0 };
-    for (const r of rooms) c[r.status] += 1;
+    const c: Record<TicketStatus, number> = { open: 0, complete: 0 };
+    for (const t of tickets) c[t.status] += 1;
     return c;
-  }, [rooms]);
+  }, [tickets]);
 
-  // Only digits matter in a room number, so ignore anything else that's typed.
-  const query = search.replace(/\D/g, '');
-  const narrowed = query.length > 0 || filter !== 'all';
+  /**
+   * Open jobs come first whatever the sort — the list exists to show what
+   * still needs doing. Inside each group the newest is on top, which for a
+   * finished job means the day it was finished, not the day it was reported.
+   */
+  const visible = useMemo(() => {
+    const shown = tickets.filter((t) => filter === 'all' || t.status === filter);
+    return shown.slice().sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
+      if (a.status === 'complete') return (b.completedAt ?? 0) - (a.completedAt ?? 0);
+      return b.reportedAt - a.reportedAt;
+    });
+  }, [tickets, filter]);
 
-  const visibleRooms = useMemo(
-    () =>
-      rooms.filter(
-        (r) => (filter === 'all' || r.status === filter) && (!query || r.name.includes(query)),
-      ),
-    [rooms, filter, query],
-  );
-
-  const floors = useMemo(() => {
-    const byFloor = new Map<string, Room[]>();
-    for (const r of visibleRooms) {
-      const f = floorOf(r.name);
-      const list = byFloor.get(f);
-      if (list) list.push(r);
-      else byFloor.set(f, [r]);
-    }
-    return FLOOR_IDS.filter((f) => byFloor.has(f)).map((f) => ({
-      id: f,
-      rooms: byFloor.get(f) as Room[],
-    }));
-  }, [visibleRooms]);
-
-  const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null;
+  const selected = tickets.find((t) => t.id === selectedId) ?? null;
 
   if (!started) {
     return (
@@ -76,32 +76,21 @@ export default function App() {
     );
   }
 
-  if (!role) {
-    return (
-      <RolePicker
-        onPick={(picked) => {
-          saveRole(picked);
-          setRole(picked);
-        }}
-      />
-    );
-  }
-
-  const canEdit = role === 'maintenance';
-
   /**
-   * A write that never reaches Firestore still shows locally, so warn if it
-   * hasn't confirmed — otherwise a lost change looks exactly like a saved one.
+   * Every write goes through here so a failure is reported the same way. A
+   * write that never reaches Firestore still shows on this phone, so a write
+   * that hasn't confirmed gets called out — otherwise a lost change looks
+   * exactly like a saved one.
    */
-  function saveStatus(room: Room, status: RoomStatus, details: RoomDetails) {
+  function run(action: Promise<unknown>, subject: string) {
     setSaveError(null);
     let settled = false;
     const pending = setTimeout(() => {
       if (!settled) {
-        setSaveError(`Room ${room.name} hasn't synced yet — keep the app open until it does.`);
+        setSaveError(`${subject} hasn't synced yet — keep the app open until it does.`);
       }
-    }, 6000);
-    setRoomStatus(room.id, status, details)
+    }, SYNC_WARN_MS);
+    action
       .then(() => {
         settled = true;
         clearTimeout(pending);
@@ -110,22 +99,51 @@ export default function App() {
       .catch((err: unknown) => {
         settled = true;
         clearTimeout(pending);
-        console.error('Failed to save room status', err);
-        setSaveError(`Couldn't save Room ${room.name}. ${describeError(err)}`);
+        console.error(`Write failed for ${subject}`, err);
+        setSaveError(`Couldn't save ${subject}. ${describeError(err)}`);
       });
   }
 
-  /** Pull the full maintenance history and download it as an .xlsx. */
+  /**
+   * The sheet closes straight away rather than waiting on the write. Firestore
+   * only settles that promise once the server has it, so waiting would hang
+   * the form offline — which is where half this property's dead spots are.
+   * The report is already in the local cache, so it shows up in the list
+   * immediately either way, and `run` warns if it never reaches the server.
+   */
+  function handleCreate(room: string, problem: string) {
+    setComposing(false);
+    run(createTicket(room, problem), `Room ${room}`);
+  }
+
+  function handleSave(work: TicketWork) {
+    if (!selected) return;
+    run(saveWork(selected.id, work), `Room ${selected.room}`);
+    setSelectedId(null);
+  }
+
+  function handleComplete(work: TicketWork) {
+    if (!selected) return;
+    run(completeTicket(selected.id, work), `Room ${selected.room}`);
+    setSelectedId(null);
+  }
+
+  function handleReopen() {
+    if (!selected) return;
+    run(reopenTicket(selected.id), `Room ${selected.room}`);
+    setSelectedId(null);
+  }
+
+  /** Build the spreadsheet from what the listener already holds. */
   async function handleExport() {
     setExporting(true);
     setSaveError(null);
     try {
-      const entries = await loadAllHistory();
-      if (entries.length === 0) {
-        setSaveError('No maintenance history to export yet.');
+      if (tickets.length === 0) {
+        setSaveError('No maintenance reports to export yet.');
         return;
       }
-      await exportLogToXlsx(entries);
+      await exportTicketsToXlsx(tickets);
     } catch (err) {
       console.error('Export failed', err);
       setSaveError(`Couldn't build the spreadsheet. ${describeError(err)}`);
@@ -135,35 +153,18 @@ export default function App() {
   }
 
   /** Tapping the active count clears the filter, so the pills double as a toggle. */
-  function toggleFilter(status: RoomStatus) {
+  function toggleFilter(status: TicketStatus) {
     setFilter((prev) => (prev === status ? 'all' : status));
-    setOpenFloors({});
-  }
-
-  function switchRole() {
-    clearRole();
-    setRole(null);
-    setSelectedId(null);
-    setFilter('all');
-    setSearch('');
   }
 
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-row">
-          <div className="header-title">
-            <h1>FixReady</h1>
-            <span className="role-tag">{ROLE_LABEL[role]}</span>
-          </div>
-          <div className="header-actions">
-            <button className="bell-btn" onClick={handleExport} disabled={exporting}>
-              {exporting ? 'Exporting…' : 'Export'}
-            </button>
-            <button className="bell-btn" onClick={switchRole}>
-              Switch
-            </button>
-          </div>
+          <h1>FixReady</h1>
+          <button className="bell-btn" onClick={handleExport} disabled={exporting}>
+            {exporting ? 'Exporting…' : 'Export'}
+          </button>
         </div>
         {!isFirebaseConfigured && (
           <p className="demo-banner">
@@ -183,39 +184,6 @@ export default function App() {
             </button>
           ))}
         </div>
-        <div className="search-row">
-          <input
-            className="search-input"
-            type="search"
-            inputMode="numeric"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setOpenFloors({});
-            }}
-            placeholder="Search room number"
-            aria-label="Search room number"
-          />
-          {search && (
-            <button
-              className="search-clear"
-              onClick={() => {
-                setSearch('');
-                setOpenFloors({});
-              }}
-              aria-label="Clear search"
-            >
-              ×
-            </button>
-          )}
-        </div>
-        <p className="role-hint">
-          {filter === 'all'
-            ? canEdit
-              ? 'Tap a count to filter, or a room to change its status.'
-              : 'Tap a count above to see just those rooms.'
-            : `Showing ${STATUS_LABEL[filter]} only — tap it again to show all rooms.`}
-        </p>
       </header>
 
       {saveError && (
@@ -227,8 +195,8 @@ export default function App() {
         </div>
       )}
 
-      <main className="room-list">
-        {loading && !slow && <p className="muted">Loading rooms…</p>}
+      <main className="ticket-list">
+        {loading && !slow && <p className="muted">Loading reports…</p>}
         {loading && slow && (
           <div className="alert">
             <span>Still waiting on the database. You may be offline.</span>
@@ -245,38 +213,34 @@ export default function App() {
             </button>
           </div>
         )}
-        {!loading && !error && floors.length === 0 && (
+        {!loading && !error && visible.length === 0 && (
           <p className="muted">
-            {query ? `No room matching "${query}".` : 'No rooms with this status.'}
+            {filter === 'all'
+              ? 'No maintenance reports yet. Tap + to add the first one.'
+              : `No ${STATUS_LABEL[filter].toLowerCase()} reports.`}
           </p>
         )}
-        {floors.map(({ id, rooms: floorRooms }) => (
-          <FloorSection
-            key={id}
-            label={`Floor ${id}`}
-            rooms={floorRooms}
-            // Floors start closed, but a search or status filter opens them so
-            // matches are never hidden behind a collapsed section.
-            open={openFloors[id] ?? narrowed}
-            onToggle={() => setOpenFloors((prev) => ({ ...prev, [id]: !(prev[id] ?? narrowed) }))}
-          >
-            {floorRooms.map((room) => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                onTap={canEdit ? () => setSelectedId(room.id) : undefined}
-              />
-            ))}
-          </FloorSection>
+        {visible.map((ticket) => (
+          <TicketCard key={ticket.id} ticket={ticket} onTap={() => setSelectedId(ticket.id)} />
         ))}
       </main>
 
-      {canEdit && selectedRoom && (
-        <StatusSheet
-          room={selectedRoom}
+      <button className="fab" onClick={() => setComposing(true)} aria-label="New maintenance report">
+        +
+      </button>
+
+      {composing && <NewTicketSheet onClose={() => setComposing(false)} onCreate={handleCreate} />}
+
+      {selected && (
+        <TicketSheet
+          ticket={selected}
           onClose={() => setSelectedId(null)}
-          onSave={(status, details) => saveStatus(selectedRoom, status, details)}
-          loadHistory={loadRoomHistory}
+          onSave={handleSave}
+          onComplete={handleComplete}
+          onReopen={handleReopen}
+          fetchPhotos={fetchPhotos}
+          addPhoto={addPhoto}
+          removePhoto={removePhoto}
         />
       )}
     </div>

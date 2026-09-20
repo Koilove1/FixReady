@@ -8,17 +8,21 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    match /rooms/{roomId} {
-      allow read: if signedIn();
-      allow create, update, delete: if signedIn();
-    }
+    match /tickets/{ticketId} {
+      // Closing a job, reopening it and correcting its notes are all updates.
+      // Nothing in the app deletes a report: the list of jobs is the record
+      // the spreadsheet is built from.
+      allow read, create, update: if signedIn();
+      allow delete: if false;
 
-    // The maintenance history is append-only: entries can be read and created,
-    // never edited or deleted. The {path=**} form also covers the collection
-    // group query the Excel export runs across every room's log.
-    match /{path=**}/log/{entryId} {
-      allow read, create: if signedIn();
-      allow update, delete: if false;
+      // Photos are compressed JPEGs held inline, so each one is a document of
+      // its own -- that keeps the ticket small enough for the list to stream
+      // every report without pulling the images down with it. A bad shot can
+      // be deleted; an existing one is never rewritten.
+      match /photos/{photoId} {
+        allow read, create, delete: if signedIn();
+        allow update: if false;
+      }
     }
   }
 }

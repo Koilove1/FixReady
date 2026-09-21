@@ -13,7 +13,7 @@ import {
   increment,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase';
+import { db, isFirebaseConfigured, ensureSignedIn } from '../firebase';
 import { loadTickets, saveTickets, loadPhotos, savePhotos } from '../localStore';
 import { normalizeStatus } from '../types';
 import type { Ticket, TicketWork, TicketPhoto } from '../types';
@@ -27,6 +27,11 @@ export function describeError(err: unknown): string {
   // already written for a person — pass it straight through.
   if (err instanceof Error && !('code' in err)) return err.message;
   const code = (err as { code?: string } | null)?.code ?? '';
+  // Auth codes are namespaced and would otherwise fall through to the vague
+  // default, blaming the database for something sign-in did.
+  if (code.startsWith('auth/')) {
+    return 'Sign-in failed. Check that Anonymous sign-in is enabled in Firebase.';
+  }
   switch (code) {
     case 'permission-denied':
     case 'unauthenticated':
@@ -92,25 +97,46 @@ export function useTickets() {
     // error — so a timer is the only way out of an endless "Loading…".
     const slowTimer = setTimeout(() => setSlow(true), SLOW_MS);
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        clearTimeout(slowTimer);
-        setSlow(false);
-        setError(null);
-        setTickets(snap.docs.map(mapTicket));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Ticket listener failed', err);
+    let unsub = () => {};
+    let dropped = false;
+
+    // The rules require a signed-in user. Attaching the listener before the
+    // anonymous sign-in lands is what made a fresh install open on "the
+    // database refused the request" until it was retried by hand — a phone
+    // that had signed in before never showed it, because its session was
+    // already cached.
+    ensureSignedIn()
+      .then(() => {
+        if (dropped) return;
+        unsub = onSnapshot(
+          q,
+          (snap) => {
+            clearTimeout(slowTimer);
+            setSlow(false);
+            setError(null);
+            setTickets(snap.docs.map(mapTicket));
+            setLoading(false);
+          },
+          (err) => {
+            console.error('Ticket listener failed', err);
+            clearTimeout(slowTimer);
+            setSlow(false);
+            setError(describeError(err));
+            setLoading(false);
+          },
+        );
+      })
+      .catch((err: unknown) => {
+        console.error('Sign-in failed', err);
+        if (dropped) return;
         clearTimeout(slowTimer);
         setSlow(false);
         setError(describeError(err));
         setLoading(false);
-      },
-    );
+      });
 
     return () => {
+      dropped = true;
       clearTimeout(slowTimer);
       unsub();
     };
@@ -150,6 +176,9 @@ export function useTickets() {
       return ticket.id;
     }
     const { id, ...fields } = ticket;
+    // The button that gets here is on screen while the list is still loading,
+    // so the sign-in may not have landed yet.
+    await ensureSignedIn();
     await setDoc(doc(db, 'tickets', id), fields);
     return id;
   }, []);

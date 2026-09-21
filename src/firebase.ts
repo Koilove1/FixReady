@@ -6,7 +6,7 @@ import {
   persistentMultipleTabManager,
   type Firestore,
 } from 'firebase/firestore';
-import { getAuth, signInAnonymously, type Auth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -53,9 +53,37 @@ if (isFirebaseConfigured) {
 
 export { app, db, auth };
 
-export async function ensureSignedIn(): Promise<void> {
-  if (!auth) return;
-  if (!auth.currentUser) {
-    await signInAnonymously(auth);
+/** Shared so every caller waits on one sign-in rather than starting its own. */
+let signIn: Promise<void> | null = null;
+
+/**
+ * Resolves once there is a user the Firestore rules will accept.
+ *
+ * Reading `auth.currentUser` directly is not enough: on a cold start Firebase
+ * restores a persisted session asynchronously, so it is briefly null even for
+ * a device that has been signed in for months. Acting on that would sign in a
+ * second anonymous user and orphan the first. `onAuthStateChanged` fires once
+ * the restore has settled, which is the first honest answer available.
+ */
+export function ensureSignedIn(): Promise<void> {
+  if (!auth) return Promise.resolve();
+  if (!signIn) {
+    const instance = auth;
+    signIn = new Promise<void>((resolve, reject) => {
+      const stop = onAuthStateChanged(
+        instance,
+        (user) => {
+          stop();
+          if (user) resolve();
+          else signInAnonymously(instance).then(() => resolve(), reject);
+        },
+        reject,
+      );
+    });
+    // A failed sign-in has to be retryable, so don't leave the rejection cached.
+    signIn.catch(() => {
+      signIn = null;
+    });
   }
+  return signIn;
 }

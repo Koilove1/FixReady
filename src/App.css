@@ -35,15 +35,24 @@ body {
 
 .app {
   min-height: 100%;
-  padding: max(env(safe-area-inset-top), 12px) 12px calc(24px + env(safe-area-inset-bottom));
+  padding: 0 12px calc(24px + env(safe-area-inset-bottom));
 }
 
 /* Header */
+/*
+ * The page is drawn under the status bar (viewport-fit=cover with a
+ * translucent bar), so the header carries the status-bar inset itself. When
+ * the inset sat on .app instead, it scrolled away with the page and the header
+ * pinned at the very top of the glass — the title and the cards behind it slid
+ * under the clock, where iOS blurs whatever it's drawn over. Padding the sticky
+ * element keeps a solid band behind the status bar at every scroll position.
+ */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 5;
   background: var(--bg);
+  padding-top: max(env(safe-area-inset-top), 12px);
   padding-bottom: 10px;
 }
 

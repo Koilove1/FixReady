@@ -25,33 +25,20 @@ const COLUMNS = [
   { header: 'Photos', width: 8 },
 ];
 
-/**
- * Build a real .xlsx from every maintenance report and hand it to the browser
- * as a download. `xlsx` is imported on demand so it stays out of the initial
- * bundle — the library is only pulled in when someone actually exports.
- *
- * Photos are counted rather than embedded: they live in the app, and the
- * spreadsheet is the written record of what was done.
- */
-export async function exportTicketsToXlsx(tickets: Ticket[]): Promise<void> {
-  const XLSX = await import('xlsx');
+type Xlsx = typeof import('xlsx');
 
-  const rows = tickets
-    .slice()
-    // Group by room, then oldest-to-newest within each room, so the sheet
-    // reads like a logbook for the property.
-    .sort((a, b) => a.room.localeCompare(b.room) || a.reportedAt - b.reportedAt)
-    .map((t) => ({
-      // A number, so Excel sorts and filters the column numerically.
-      Room: Number(t.room),
-      Reported: sheetDate(t.reportedAt),
-      Problem: t.problem,
-      Fix: t.fix ?? '',
-      'Materials Used': t.materials ?? '',
-      Completed: sheetDate(t.completedAt),
-      Status: STATUS_LABEL[t.status],
-      Photos: t.photoCount,
-    }));
+function buildSheet(XLSX: Xlsx, tickets: Ticket[]) {
+  const rows = tickets.map((t) => ({
+    // A number, so Excel sorts and filters the column numerically.
+    Room: Number(t.room),
+    Reported: sheetDate(t.reportedAt),
+    Problem: t.problem,
+    Fix: t.fix ?? '',
+    'Materials Used': t.materials ?? '',
+    Completed: sheetDate(t.completedAt),
+    Status: STATUS_LABEL[t.status],
+    Photos: t.photoCount,
+  }));
 
   const sheet = XLSX.utils.json_to_sheet(rows, {
     header: COLUMNS.map((c) => c.header),
@@ -64,9 +51,38 @@ export async function exportTicketsToXlsx(tickets: Ticket[]): Promise<void> {
       e: { r: rows.length, c: COLUMNS.length - 1 },
     }),
   };
+  return sheet;
+}
+
+/**
+ * The same reports in two orders, one per tab. By Date comes first because
+ * the file opens on its first tab, and the usual reason to open it is recent
+ * work — what got done this week, what's still waiting. By Room reads like a
+ * logbook for the property and is where repeat problems in one room show up.
+ */
+export function buildWorkbook(XLSX: Xlsx, tickets: Ticket[]) {
+  const byDate = tickets.slice().sort((a, b) => b.reportedAt - a.reportedAt);
+  const byRoom = tickets
+    .slice()
+    .sort((a, b) => a.room.localeCompare(b.room) || a.reportedAt - b.reportedAt);
 
   const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, 'Maintenance');
+  XLSX.utils.book_append_sheet(book, buildSheet(XLSX, byDate), 'By Date');
+  XLSX.utils.book_append_sheet(book, buildSheet(XLSX, byRoom), 'By Room');
+  return book;
+}
+
+/**
+ * Build a real .xlsx from every maintenance report and hand it to the browser
+ * as a download. `xlsx` is imported on demand so it stays out of the initial
+ * bundle — the library is only pulled in when someone actually exports.
+ *
+ * Photos are counted rather than embedded: they live in the app, and the
+ * spreadsheet is the written record of what was done.
+ */
+export async function exportTicketsToXlsx(tickets: Ticket[]): Promise<void> {
+  const XLSX = await import('xlsx');
+  const book = buildWorkbook(XLSX, tickets);
 
   const data = XLSX.write(book, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([data], {

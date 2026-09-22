@@ -22,7 +22,11 @@ go back to all.
 
 ## The spreadsheet
 
-One row per report, grouped by room and oldest-first within each room, so it reads like a logbook:
+One row per report, on two tabs with the same columns:
+
+- **By Date** (the tab the file opens on): newest report first, for recent work and what's open.
+- **By Room**: grouped by room, oldest first within each room, so it reads like a logbook and
+  repeat problems in one room stand out.
 
 | Room | Reported | Problem | Fix | Materials Used | Completed | Status | Photos |
 | ---- | -------- | ------- | --- | -------------- | --------- | ------ | ------ |

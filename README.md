@@ -70,10 +70,20 @@ You have to do these steps yourself since they're tied to your Google account.
    cp .env.example .env.local
    ```
    Paste in the values from step 2.
-5. **Deploy the rules** in `firestore.rules`:
-   ```
-   npx firebase deploy --only firestore:rules
-   ```
+5. **Deploy** — see below.
+
+## Deploying
+
+```
+npm run deploy
+```
+
+Builds the app, then publishes the site and the Firestore rules together. They always go out as a
+pair because the app and the rules have to agree on which collections exist; shipping one without
+the other locks the app out of its own data.
+
+It runs `firebase deploy --non-interactive`. Without that flag the CLI has been known to stop at a
+prompt hidden behind its progress spinner and wait forever.
 
 ## Data model
 

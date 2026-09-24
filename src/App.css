@@ -83,6 +83,78 @@ body {
   opacity: 0.5;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* History: title centred between Back and an equal-width spacer. */
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 8px 0;
+  width: 72px;
+  text-align: left;
+}
+
+.header-spacer {
+  width: 72px;
+}
+
+.history-search {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+
+.history-search input {
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.search-incident {
+  grid-column: 1 / -1;
+}
+
+/* iOS leaves an empty date input with no height and no hint text. */
+.search-date {
+  min-height: 44px;
+  color-scheme: dark;
+}
+
+.history-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.history-status .link-btn {
+  color: var(--accent);
+  padding: 8px 2px;
+}
+
+.history-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-month {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Blue, not amber — amber now means "Open" everywhere else. */
 .demo-banner {
   background: rgba(86, 204, 242, 0.1);

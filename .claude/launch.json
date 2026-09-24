@@ -6,6 +6,17 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "fixready-demo",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_FIREBASE_API_KEY=",
+        "VITE_FIREBASE_PROJECT_ID=",
+        "VITE_FIREBASE_APP_ID=",
+        "npx", "vite", "--port", "5174", "--strictPort"
+      ],
+      "port": 5174
     }
   ]
 }

@@ -6,6 +6,7 @@ import { WelcomeScreen, hasOpenedBefore, markOpened } from './components/Welcome
 import { TicketCard } from './components/TicketCard';
 import { NewTicketSheet } from './components/NewTicketSheet';
 import { TicketSheet } from './components/TicketSheet';
+import { HistoryScreen } from './components/HistoryScreen';
 import { exportTicketsToXlsx } from './exportXlsx';
 import { STATUS_ORDER, STATUS_LABEL } from './types';
 import type { TicketStatus, TicketWork } from './types';
@@ -14,6 +15,13 @@ type Filter = 'all' | TicketStatus;
 
 /** How long a write may stay unconfirmed before the app says so. */
 const SYNC_WARN_MS = 6000;
+
+/**
+ * Finished jobs stay on the main list this long, so something closed by
+ * mistake is still easy to find. Older ones live in History.
+ */
+const RECENT_DAYS = 7;
+const RECENT_MS = RECENT_DAYS * 24 * 60 * 60 * 1000;
 
 export default function App() {
   /** The opening screen is a first-run introduction; later launches skip it. */
@@ -38,16 +46,27 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>('all');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [view, setView] = useState<'list' | 'history'>('list');
 
   useEffect(() => {
     void ensureSignedIn();
   }, []);
 
+  /**
+   * The main list: every open job, plus whatever was finished in the last
+   * RECENT_DAYS. Worked out once per snapshot rather than per render, so a
+   * job doesn't slip off the list mid-scroll — it goes at the next update.
+   */
+  const current = useMemo(() => {
+    const cutoff = Date.now() - RECENT_MS;
+    return tickets.filter((t) => t.status === 'open' || (t.completedAt ?? 0) >= cutoff);
+  }, [tickets]);
+
   const counts = useMemo(() => {
     const c: Record<TicketStatus, number> = { open: 0, complete: 0 };
-    for (const t of tickets) c[t.status] += 1;
+    for (const t of current) c[t.status] += 1;
     return c;
-  }, [tickets]);
+  }, [current]);
 
   /**
    * Open jobs come first whatever the sort — the list exists to show what
@@ -55,13 +74,13 @@ export default function App() {
    * finished job means the day it was finished, not the day it was reported.
    */
   const visible = useMemo(() => {
-    const shown = tickets.filter((t) => filter === 'all' || t.status === filter);
+    const shown = current.filter((t) => filter === 'all' || t.status === filter);
     return shown.slice().sort((a, b) => {
       if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
       if (a.status === 'complete') return (b.completedAt ?? 0) - (a.completedAt ?? 0);
       return b.reportedAt - a.reportedAt;
     });
-  }, [tickets, filter]);
+  }, [current, filter]);
 
   const selected = tickets.find((t) => t.id === selectedId) ?? null;
 
@@ -157,14 +176,57 @@ export default function App() {
     setFilter((prev) => (prev === status ? 'all' : status));
   }
 
+  /** Each screen starts at its top rather than wherever the other was scrolled. */
+  function showView(next: 'list' | 'history') {
+    setView(next);
+    window.scrollTo(0, 0);
+  }
+
+  const alerts = saveError && (
+    <div className="alert warning">
+      <span>{saveError}</span>
+      <button className="link-btn" onClick={() => setSaveError(null)}>
+        Dismiss
+      </button>
+    </div>
+  );
+
+  const ticketSheet = selected && (
+    <TicketSheet
+      ticket={selected}
+      onClose={() => setSelectedId(null)}
+      onSave={handleSave}
+      onComplete={handleComplete}
+      onReopen={handleReopen}
+      fetchPhotos={fetchPhotos}
+      addPhoto={addPhoto}
+      removePhoto={removePhoto}
+    />
+  );
+
+  if (view === 'history') {
+    return (
+      <div className="app">
+        <HistoryScreen tickets={tickets} onBack={() => showView('list')} onSelect={setSelectedId} />
+        {alerts}
+        {ticketSheet}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-row">
           <h1>FixReady</h1>
-          <button className="bell-btn" onClick={handleExport} disabled={exporting}>
-            {exporting ? 'Exporting…' : 'Export'}
-          </button>
+          <div className="header-actions">
+            <button className="bell-btn" onClick={() => showView('history')}>
+              History
+            </button>
+            <button className="bell-btn" onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Exporting…' : 'Export'}
+            </button>
+          </div>
         </div>
         {!isFirebaseConfigured && (
           <p className="demo-banner">
@@ -180,20 +242,15 @@ export default function App() {
               aria-pressed={filter === s}
             >
               <span className="summary-count">{counts[s]}</span>
-              <span className="summary-label">{STATUS_LABEL[s]}</span>
+              <span className="summary-label">
+                {s === 'complete' ? `Complete · last ${RECENT_DAYS} days` : STATUS_LABEL[s]}
+              </span>
             </button>
           ))}
         </div>
       </header>
 
-      {saveError && (
-        <div className="alert warning">
-          <span>{saveError}</span>
-          <button className="link-btn" onClick={() => setSaveError(null)}>
-            Dismiss
-          </button>
-        </div>
-      )}
+      {alerts}
 
       <main className="ticket-list">
         {loading && !slow && <p className="muted">Loading reports…</p>}
@@ -215,9 +272,13 @@ export default function App() {
         )}
         {!loading && !error && visible.length === 0 && (
           <p className="muted">
-            {filter === 'all'
-              ? 'No maintenance reports yet. Tap + to add the first one.'
-              : `No ${STATUS_LABEL[filter].toLowerCase()} reports.`}
+            {filter === 'open'
+              ? 'No open reports.'
+              : filter === 'complete'
+                ? `Nothing completed in the last ${RECENT_DAYS} days. Older jobs are in History.`
+                : tickets.length > 0
+                  ? `Nothing open and nothing completed in the last ${RECENT_DAYS} days. Older jobs are in History.`
+                  : 'No maintenance reports yet. Tap + to add the first one.'}
           </p>
         )}
         {visible.map((ticket) => (
@@ -231,18 +292,7 @@ export default function App() {
 
       {composing && <NewTicketSheet onClose={() => setComposing(false)} onCreate={handleCreate} />}
 
-      {selected && (
-        <TicketSheet
-          ticket={selected}
-          onClose={() => setSelectedId(null)}
-          onSave={handleSave}
-          onComplete={handleComplete}
-          onReopen={handleReopen}
-          fetchPhotos={fetchPhotos}
-          addPhoto={addPhoto}
-          removePhoto={removePhoto}
-        />
-      )}
+      {ticketSheet}
     </div>
   );
 }
